@@ -9,6 +9,8 @@ import {
   claimLateNightAllowance,
   completeDayAndCheckout,
 } from '@/app/actions/field';
+import { CameraCaptureModal } from './camera-capture-modal';
+import { AttendanceCorrectionModal } from './attendance-correction-modal';
 
 type Props = {
   attendance?: Attendance | null;
@@ -28,6 +30,9 @@ export function ShiftAttendanceManager({
   const [showOvertimeModal, setShowOvertimeModal] = useState(false);
   const [showAllowanceModal, setShowAllowanceModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [pendingMode, setPendingMode] = useState<'OFFICE' | 'FIELD'>('OFFICE');
+  const [correctionOpen, setCorrectionOpen] = useState(false);
   const [, startTransition] = useTransition();
 
   // Form states for Overtime
@@ -95,33 +100,51 @@ export function ShiftAttendanceManager({
     });
   };
 
-  // Action: Check In With Type (Office or Field)
-  const handleCheckIn = async (mode: 'OFFICE' | 'FIELD') => {
+  // Action: Trigger camera capture with live GPS verification
+  const handleInitiatePunch = (mode: 'OFFICE' | 'FIELD') => {
+    setPendingMode(mode);
+    setCameraOpen(true);
+  };
+
+  const handleCameraConfirm = async (
+    photoDataUrl: string,
+    coords: { latitude: number; longitude: number; accuracy: number }
+  ) => {
     setError(null);
     setPending(true);
     try {
-      const pos = await getCoordinates();
       const fd = new FormData();
-      fd.set('mode', mode);
-      fd.set('latitude', String(pos.latitude));
-      fd.set('longitude', String(pos.longitude));
-      fd.set('accuracy', String(pos.accuracy));
+      fd.set('mode', pendingMode);
+      fd.set('latitude', String(coords.latitude));
+      fd.set('longitude', String(coords.longitude));
+      fd.set('accuracy', String(coords.accuracy));
+      fd.set('photo', photoDataUrl);
       fd.set('local_date', new Intl.DateTimeFormat('en-CA').format(new Date()));
 
       const res = await checkInWithType(fd);
-      if (res.error) {
+      if (res?.error) {
         setError(res.error);
       } else {
-        setStatusMessage(`Successfully punched in for ${mode === 'OFFICE' ? 'Office' : 'Field Operations'}!`);
+        setCameraOpen(false);
+        setStatusMessage(
+          `✓ Verified photo & successfully punched in for ${
+            pendingMode === 'OFFICE' ? 'Office' : 'Field Operations'
+          }!`
+        );
         startTransition(() => {
           window.location.reload();
         });
       }
     } catch (err: any) {
-      setError(err?.message || 'Unable to capture GPS location.');
+      setError(err?.message || 'Unable to submit attendance verification.');
     } finally {
       setPending(false);
     }
+  };
+
+  // Direct check-in fallback if needed
+  const handleCheckIn = async (mode: 'OFFICE' | 'FIELD') => {
+    handleInitiatePunch(mode);
   };
 
   // Action: Activate Overtime
@@ -318,10 +341,11 @@ export function ShiftAttendanceManager({
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => handleCheckIn('OFFICE')}
-                  className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                  onClick={() => handleInitiatePunch('OFFICE')}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  {pending ? 'Verifying GPS…' : 'Punch In (Office)'}
+                  <span>📸</span>
+                  <span>{pending ? 'Verifying…' : 'Take Selfie & Punch In (Office)'}</span>
                 </button>
               </div>
             </div>
@@ -347,10 +371,11 @@ export function ShiftAttendanceManager({
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => handleCheckIn('FIELD')}
-                  className="w-full rounded-xl bg-[var(--navy)] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+                  onClick={() => handleInitiatePunch('FIELD')}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--navy)] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {pending ? 'Verifying GPS…' : 'Punch In (Field Operations)'}
+                  <span>📸</span>
+                  <span>{pending ? 'Verifying…' : 'Take Selfie & Punch In (Field)'}</span>
                 </button>
               </div>
             </div>
@@ -403,6 +428,14 @@ export function ShiftAttendanceManager({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setCorrectionOpen(true)}
+                className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-900 transition hover:bg-amber-100 shadow-sm"
+              >
+                🛠️ Mistake? Switch Mode / Reset
+              </button>
               {/* Regular Checkout Button if needed */}
               <button
                 type="button"
@@ -537,14 +570,23 @@ export function ShiftAttendanceManager({
               </div>
             </div>
 
-            {/* Option to re-open for after-hours field emergency */}
-            <button
-              type="button"
-              onClick={() => setShowOvertimeModal(true)}
-              className="rounded-xl border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-800 transition hover:bg-purple-100"
-            >
-              🌙 Start Emergency Overtime
-            </button>
+            {/* Option to correct or re-open for after-hours field emergency */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCorrectionOpen(true)}
+                className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 transition hover:bg-amber-100 shadow-sm"
+              >
+                🛠️ Mistake? Re-Open Shift / Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowOvertimeModal(true)}
+                className="rounded-xl border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-800 transition hover:bg-purple-100"
+              >
+                🌙 Start Emergency Overtime
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -758,6 +800,32 @@ export function ShiftAttendanceManager({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Live Selfie Camera Modal with GPS */}
+      <CameraCaptureModal
+        isOpen={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        mode={pendingMode}
+        submitting={pending}
+        onConfirm={handleCameraConfirm}
+      />
+
+      {/* Attendance Mistake / Correction Modal */}
+      {attendance && (
+        <AttendanceCorrectionModal
+          isOpen={correctionOpen}
+          onClose={() => setCorrectionOpen(false)}
+          attendanceId={attendance.id}
+          currentMode={isOffice ? 'OFFICE' : 'FIELD'}
+          isCheckedOut={isCheckedOut}
+          onSuccess={() => {
+            setStatusMessage('Attendance correction successfully applied.');
+            startTransition(() => {
+              window.location.reload();
+            });
+          }}
+        />
       )}
     </div>
   );

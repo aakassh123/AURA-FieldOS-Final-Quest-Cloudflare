@@ -55,6 +55,7 @@ export default async function AttendancePage() {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   <th className="p-4">Date</th>
+                  <th className="p-4">Photo Selfie</th>
                   <th className="p-4">Workplace Mode</th>
                   <th className="p-4">Status</th>
                   <th className="p-4">Check In</th>
@@ -68,6 +69,8 @@ export default async function AttendancePage() {
                   const checkInNote = String(a.check_in_note ?? '').toUpperCase();
                   const isOffice = checkInNote.includes('OFFICE');
                   const isOvertime = checkInNote.includes('OVERTIME');
+                  const photoMatch = a.check_in_note?.match(/PHOTO:([^\s|]+)/);
+                  const photoUrl = photoMatch ? photoMatch[1] : null;
 
                   return (
                     <tr key={a.id} className="hover:bg-slate-50/60">
@@ -75,6 +78,32 @@ export default async function AttendancePage() {
                         {new Date(a.attendance_date + 'T00:00:00').toLocaleDateString('en-IN', {
                           dateStyle: 'medium',
                         })}
+                      </td>
+
+                      <td className="p-4">
+                        {photoUrl ? (
+                          <a
+                            href={photoUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="group flex items-center gap-1.5"
+                            title="Click to view full photo"
+                          >
+                            <img
+                              src={photoUrl}
+                              alt="Attendance Selfie"
+                              className="h-9 w-9 rounded-full border-2 border-teal-500/50 object-cover shadow-sm transition group-hover:scale-110"
+                            />
+                            <span className="text-[10px] font-bold text-teal-700 underline group-hover:text-teal-900">
+                              View
+                            </span>
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                            <span>📷</span>
+                            <span>Standard</span>
+                          </span>
+                        )}
                       </td>
 
                       <td className="p-4">
@@ -128,7 +157,7 @@ export default async function AttendancePage() {
 
                 {!data.attendance.length && (
                   <tr>
-                    <td colSpan={7} className="p-12 text-center text-sm text-slate-400">
+                    <td colSpan={8} className="p-12 text-center text-sm text-slate-400">
                       No attendance records found yet.
                     </td>
                   </tr>

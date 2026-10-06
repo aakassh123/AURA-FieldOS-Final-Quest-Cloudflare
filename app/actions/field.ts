@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 function text(value: FormDataEntryValue | null) { return typeof value === 'string' ? value.trim() : ''; }
 function num(value: FormDataEntryValue | null) { const n = Number(value); return Number.isFinite(n) ? n : null; }
@@ -206,21 +207,59 @@ export async function checkInWithType(formData: FormData) {
     const latitude = num(formData.get('latitude')) ?? 26.8467;
     const longitude = num(formData.get('longitude')) ?? 80.9462;
     const accuracy = num(formData.get('accuracy')) ?? 20;
+    const photoData = text(formData.get('photo'));
+    const customNote = text(formData.get('note'));
+    const allowRecheckin = formData.get('allow_recheckin') === 'true';
 
     const today = text(formData.get('local_date')) || new Intl.DateTimeFormat('en-CA').format(new Date());
 
     const { data: existing } = await supabase
       .from('attendance')
-      .select('id,check_in_at,check_out_at')
+      .select('id,check_in_at,check_out_at,check_in_note')
       .eq('employee_id', employee.id)
       .eq('attendance_date', today)
       .maybeSingle();
 
-    if (existing?.check_in_at && !existing.check_out_at) {
+    if (existing?.check_in_at && !existing.check_out_at && !allowRecheckin) {
       return { error: 'You are already checked in today.' };
     }
 
-    const note = mode === 'OFFICE' ? 'OFFICE' : 'FIELD';
+    // Process camera photo upload if provided
+    let photoUrl: string | null = null;
+    if (photoData && photoData.startsWith('data:image/')) {
+      try {
+        const admin = createAdminClient();
+        const base64Data = photoData.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const fileName = `${employee.id}/${today}_${Date.now()}.jpg`;
+        const { data: uploadRes, error: uploadErr } = await admin.storage
+          .from('attendance-photos')
+          .upload(fileName, buffer, {
+            contentType: 'image/jpeg',
+            upsert: true,
+          });
+
+        if (!uploadErr && uploadRes) {
+          const { data: pubUrl } = admin.storage
+            .from('attendance-photos')
+            .getPublicUrl(fileName);
+          photoUrl = pubUrl.publicUrl;
+        }
+      } catch (err) {
+        console.warn('Failed to upload attendance photo:', err);
+      }
+    }
+
+    let note = mode === 'OFFICE' ? 'OFFICE' : 'FIELD';
+    if (photoUrl) {
+      note += ` | PHOTO:${photoUrl}`;
+    } else if (existing?.check_in_note && existing.check_in_note.includes('PHOTO:')) {
+      const match = existing.check_in_note.match(/PHOTO:[^\s|]+/);
+      if (match) note += ` | ${match[0]}`;
+    }
+    if (customNote) {
+      note += ` | NOTE:${customNote}`;
+    }
 
     const { data: attData, error: attErr } = await supabase
       .from('attendance')
@@ -556,6 +595,119 @@ export async function completeDayAndCheckout(formData: FormData) {
     return { success: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Unable to complete day checkout.' };
+  }
+}
+
+export async function correctAttendance(formData: FormData) {
+  try {
+    const { supabase, employee } = await requireEmployee();
+    const attendanceId = formData.get('attendance_id') as string;
+    const actionType = formData.get('action_type') as string;
+    const newMode = (formData.get('mode') as string) || 'OFFICE';
+    const reason = (formData.get('reason') as string) || 'Correction requested';
+
+    if (!attendanceId) {
+      return { error: 'Attendance ID is required.' };
+    }
+
+    const { data: attendance, error: attErr } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('id', attendanceId)
+      .eq('employee_id', employee.id)
+      .single();
+
+    if (attErr || !attendance) {
+      return { error: 'Attendance record not found.' };
+    }
+
+    if (actionType === 'CHANGE_MODE') {
+      let note = attendance.check_in_note || '';
+      if (note.startsWith('OFFICE') || note.startsWith('FIELD')) {
+        note = note.replace(/^(OFFICE|FIELD)/, newMode);
+      } else {
+        note = `${newMode} | ${note}`;
+      }
+      note = `${note} | CORRECTION: Switched to ${newMode} (Reason: ${reason})`;
+
+      const { error: updateErr } = await supabase
+        .from('attendance')
+        .update({ check_in_note: note })
+        .eq('id', attendanceId);
+
+      if (updateErr) return { error: updateErr.message };
+    } else if (actionType === 'REOPEN_SHIFT') {
+      let note = attendance.check_out_note || '';
+      note = note
+        ? `${note} | REOPENED: Shift reopened at ${new Date().toLocaleTimeString()} (Reason: ${reason})`
+        : `REOPENED: Shift reopened at ${new Date().toLocaleTimeString()} (Reason: ${reason})`;
+
+      const { error: updateErr } = await supabase
+        .from('attendance')
+        .update({
+          check_out_at: null,
+          check_out_note: note,
+        })
+        .eq('id', attendanceId);
+
+      if (updateErr) return { error: updateErr.message };
+
+      // Ensure an active work session exists
+      const { data: activeSession } = await supabase
+        .from('work_sessions')
+        .select('id')
+        .eq('employee_id', employee.id)
+        .eq('status', 'ACTIVE')
+        .maybeSingle();
+
+      if (!activeSession) {
+        await supabase.from('work_sessions').insert({
+          company_id: employee.company_id,
+          employee_id: employee.id,
+          attendance_id: attendance.id,
+          status: 'ACTIVE',
+          started_at: new Date().toISOString(),
+          start_latitude: attendance.check_in_latitude,
+          start_longitude: attendance.check_in_longitude,
+        });
+      }
+    } else if (actionType === 'RESET') {
+      // Clear location points and work sessions for today's attendance
+      const { data: sessions } = await supabase
+        .from('work_sessions')
+        .select('id')
+        .eq('attendance_id', attendance.id);
+
+      if (sessions && sessions.length > 0) {
+        const sessionIds = sessions.map((s) => s.id);
+        await supabase
+          .from('work_session_location_points')
+          .delete()
+          .in('work_session_id', sessionIds);
+        await supabase
+          .from('work_sessions')
+          .delete()
+          .in('id', sessionIds);
+      }
+
+      const { error: delErr } = await supabase
+        .from('attendance')
+        .delete()
+        .eq('id', attendance.id);
+
+      if (delErr) return { error: delErr.message };
+    } else {
+      return { error: 'Unknown correction action.' };
+    }
+
+    revalidatePath('/field');
+    revalidatePath('/attendance');
+    revalidatePath('/map');
+    revalidatePath('/');
+
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Failed to apply attendance correction.' };
   }
 }
 

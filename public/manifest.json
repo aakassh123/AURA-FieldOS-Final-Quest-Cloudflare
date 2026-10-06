@@ -1,0 +1,50 @@
+{
+  "name": "AURA FieldOS",
+  "short_name": "FieldOS",
+  "description": "Enterprise Field Workforce Operating System & Attendance Platform",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Mark Attendance",
+      "url": "/attendance",
+      "description": "Punch in daily attendance with camera and GPS"
+    },
+    {
+      "name": "My Work",
+      "url": "/field",
+      "description": "View daily tasks and customer visits"
+    },
+    {
+      "name": "New Lead",
+      "url": "/leads/new",
+      "description": "Create a new sales lead"
+    }
+  ]
+}

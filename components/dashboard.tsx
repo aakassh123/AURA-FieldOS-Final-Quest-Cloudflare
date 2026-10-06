@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { checkInWithType } from "@/app/actions/field";
+import { CameraCaptureModal } from "@/components/field/camera-capture-modal";
 import type { AppRole } from "@/lib/auth/types";
 import type { DashboardData } from "@/lib/dashboard/queries";
 
@@ -32,40 +33,28 @@ function AttendanceFirstCard({
 }) {
   const router = useRouter();
   const [punching, setPunching] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [pendingMode, setPendingMode] = useState<"OFFICE" | "FIELD">("OFFICE");
   const [msg, setMsg] = useState<{ text: string; isError: boolean } | null>(null);
 
-  const getCoordinates = async () => {
-    return new Promise<{ latitude: number; longitude: number; accuracy: number }>((resolve) => {
-      if (typeof window === "undefined" || !navigator.geolocation) {
-        resolve({ latitude: 26.8467, longitude: 80.9462, accuracy: 20 });
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          resolve({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          });
-        },
-        () => {
-          resolve({ latitude: 26.8467, longitude: 80.9462, accuracy: 25 });
-        },
-        { enableHighAccuracy: true, timeout: 4000, maximumAge: 10000 }
-      );
-    });
+  const handleInitiatePunch = (mode: "OFFICE" | "FIELD") => {
+    setPendingMode(mode);
+    setCameraOpen(true);
   };
 
-  const handlePunch = async (mode: "OFFICE" | "FIELD") => {
+  const handleCameraConfirm = async (
+    photoDataUrl: string,
+    coords: { latitude: number; longitude: number; accuracy: number }
+  ) => {
     setPunching(true);
     setMsg(null);
     try {
-      const coords = await getCoordinates();
       const fd = new FormData();
-      fd.set("mode", mode);
+      fd.set("mode", pendingMode);
       fd.set("latitude", String(coords.latitude));
       fd.set("longitude", String(coords.longitude));
       fd.set("accuracy", String(coords.accuracy));
+      fd.set("photo", photoDataUrl);
       fd.set("local_date", new Intl.DateTimeFormat("en-CA").format(new Date()));
 
       const res = await checkInWithType(fd);
@@ -73,8 +62,9 @@ function AttendanceFirstCard({
         setMsg({ text: res.error, isError: true });
         setPunching(false);
       } else {
+        setCameraOpen(false);
         setMsg({
-          text: `✓ Attendance marked successfully! ${mode === "OFFICE" ? "Office" : "Field"} shift started.`,
+          text: `✓ Verified selfie & attendance marked successfully! ${pendingMode === "OFFICE" ? "Office" : "Field"} shift started.`,
           isError: false,
         });
         setTimeout(() => {
@@ -110,13 +100,21 @@ function AttendanceFirstCard({
               </p>
             </div>
           </div>
-          <Link
-            href="/attendance"
-            className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-800"
-          >
-            <span>View Attendance Log</span>
-            <Icon name="arrow-right" size={13} />
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/attendance"
+              className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100"
+            >
+              <span>🛠️ Mistake? Re-Open / Reset</span>
+            </Link>
+            <Link
+              href="/attendance"
+              className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-800"
+            >
+              <span>View Attendance Log</span>
+              <Icon name="arrow-right" size={13} />
+            </Link>
+          </div>
         </div>
       </section>
     );
@@ -193,18 +191,20 @@ function AttendanceFirstCard({
           <button
             type="button"
             disabled={punching}
-            onClick={() => handlePunch("OFFICE")}
+            onClick={() => handleInitiatePunch("OFFICE")}
             className="flex items-center gap-1.5 rounded-xl bg-[var(--navy)] px-4 py-2.5 text-xs font-bold text-white shadow transition hover:bg-slate-800 disabled:opacity-60"
           >
-            {punching ? "Punching in…" : "🏢 Punch In (Office)"}
+            <span>📸</span>
+            <span>{punching ? "Punching in…" : "🏢 Punch In (Office)"}</span>
           </button>
           <button
             type="button"
             disabled={punching}
-            onClick={() => handlePunch("FIELD")}
+            onClick={() => handleInitiatePunch("FIELD")}
             className="flex items-center gap-1.5 rounded-xl border border-teal-600 bg-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow transition hover:bg-teal-700 disabled:opacity-60"
           >
-            {punching ? "Punching in…" : "🚗 Punch In (Field)"}
+            <span>📸</span>
+            <span>{punching ? "Punching in…" : "🚗 Punch In (Field)"}</span>
           </button>
           <Link
             href="/attendance"
@@ -227,6 +227,15 @@ function AttendanceFirstCard({
           {msg.text}
         </div>
       )}
+
+      {/* Live Selfie Camera Modal with GPS */}
+      <CameraCaptureModal
+        isOpen={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        mode={pendingMode}
+        submitting={punching}
+        onConfirm={handleCameraConfirm}
+      />
     </section>
   );
 }
