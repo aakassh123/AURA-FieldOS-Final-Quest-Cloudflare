@@ -12,8 +12,41 @@ async function requireEmployee() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Authentication required');
-  const { data: employee, error } = await supabase.from('employees').select('id,company_id,full_name,role,status').eq('user_id', user.id).maybeSingle();
-  if (error || !employee) throw new Error('Your account is not linked to an employee profile.');
+  let { data: employee, error } = await supabase.from('employees').select('id,company_id,full_name,role,status').eq('user_id', user.id).maybeSingle();
+  
+  if (error || !employee) {
+    const admin = createAdminClient();
+    // Try matching by email
+    const { data: empByEmail } = await admin.from('employees').select('id,company_id,full_name,role,status').eq('email', user.email || '').maybeSingle();
+    if (empByEmail) {
+      await admin.from('employees').update({ user_id: user.id, status: 'ACTIVE' }).eq('id', empByEmail.id);
+      empByEmail.status = 'ACTIVE';
+      employee = empByEmail;
+    } else {
+      // Auto-create employee record
+      const compId = (user.user_metadata?.company_id as string) || 'f9e69ac7-7082-41db-a35a-5c77900af472';
+      const role = (user.user_metadata?.role as string) || 'SALESMAN';
+      const fullName = (user.user_metadata?.full_name as string) || user.email?.split('@')[0] || 'User';
+      const empCode = (user.user_metadata?.employee_code as string) || 'EMP-001';
+
+      const { data: newEmp } = await admin.from('employees').insert({
+        company_id: compId,
+        user_id: user.id,
+        employee_code: empCode,
+        full_name: fullName,
+        email: user.email,
+        role: role,
+        status: 'ACTIVE',
+      }).select('id,company_id,full_name,role,status').maybeSingle();
+
+      if (newEmp) {
+        employee = newEmp;
+      } else {
+        throw new Error('Your account is not linked to an employee profile.');
+      }
+    }
+  }
+
   if (employee.status !== 'ACTIVE') {
     await supabase.from('employees').update({ status: 'ACTIVE' }).eq('id', employee.id);
     employee.status = 'ACTIVE';

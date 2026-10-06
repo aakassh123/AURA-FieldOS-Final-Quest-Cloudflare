@@ -42,10 +42,14 @@ import {
   BadgeCheck,
   BadgeDollarSign,
   Banknote,
+  Eye,
+  EyeOff,
   type LucideIcon,
 } from "lucide-react";
 
 const icons: Record<string, LucideIcon> = {
+  eye: Eye,
+  "eye-off": EyeOff,
   "layout-dashboard": LayoutDashboard,
   "check-square": CheckSquare,
   users: Users,

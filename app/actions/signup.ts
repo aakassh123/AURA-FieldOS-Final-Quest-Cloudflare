@@ -7,6 +7,7 @@ export interface RegisterResult {
   error?: string;
   employeeCode?: string;
   email?: string;
+  fullName?: string;
 }
 
 function normalizeRole(
@@ -120,36 +121,55 @@ export async function registerUser(formData: FormData): Promise<RegisterResult> 
       console.warn('Profile upsert warning:', profErr.message);
     }
 
-    // 6. Upsert public.employees
-    const { error: empErr } = await admin
+    // 6. Safe insert/update into public.employees
+    const designation =
+      validRole === 'COMPANY_ADMIN'
+        ? 'Administrator'
+        : validRole === 'SALES_MANAGER'
+        ? 'Sales Manager'
+        : validRole === 'HR_ACCOUNTS'
+        ? 'HR & Accounts Executive'
+        : 'Field Executive';
+
+    const { data: existingEmp } = await admin
       .from('employees')
-      .upsert({
+      .select('id')
+      .or(`user_id.eq.${userId},email.eq.${email}`)
+      .limit(1);
+
+    if (existingEmp && existingEmp.length > 0) {
+      await admin
+        .from('employees')
+        .update({
+          company_id: defaultCompany.id,
+          user_id: userId,
+          employee_code: nextCode,
+          full_name: fullName,
+          email,
+          role: validRole,
+          designation,
+          status: 'ACTIVE',
+        })
+        .eq('id', existingEmp[0].id);
+    } else {
+      await admin.from('employees').insert({
         company_id: defaultCompany.id,
         user_id: userId,
         employee_code: nextCode,
         full_name: fullName,
         email,
         role: validRole,
-        designation:
-          validRole === 'COMPANY_ADMIN'
-            ? 'Administrator'
-            : validRole === 'SALES_MANAGER'
-            ? 'Sales Manager'
-            : validRole === 'HR_ACCOUNTS'
-            ? 'HR & Accounts Executive'
-            : 'Field Executive',
+        designation,
         status: 'ACTIVE',
         joined_at: new Intl.DateTimeFormat('en-CA').format(new Date()),
       });
-
-    if (empErr) {
-      console.warn('Employee upsert warning:', empErr.message);
     }
 
     return {
       success: true,
       employeeCode: nextCode,
       email,
+      fullName,
     };
   } catch (err: any) {
     console.error('Registration error:', err);

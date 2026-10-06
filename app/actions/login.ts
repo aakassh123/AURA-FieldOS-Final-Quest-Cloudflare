@@ -2,15 +2,44 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export async function resolveEmailFromIdentifier(identifier: string): Promise<string> {
-  const clean = identifier.trim().toLowerCase();
-  if (!clean) return '';
-  if (clean.includes('@')) {
-    return clean;
+export interface ResolveLoginResult {
+  success: boolean;
+  email: string;
+  found: boolean;
+  isEmail: boolean;
+  employeeCode?: string;
+  fullName?: string;
+  error?: string;
+}
+
+export async function resolveEmailFromIdentifier(identifier: string): Promise<ResolveLoginResult> {
+  const clean = identifier.trim();
+  if (!clean) {
+    return { success: false, email: '', found: false, isEmail: false, error: 'Please enter an Employee ID or Email.' };
   }
 
-  if (clean === 'admin' || clean === 'superadmin') {
-    return 'admin@aura.local';
+  // 1. Direct email address
+  if (clean.includes('@')) {
+    const emailLower = clean.toLowerCase();
+    return {
+      success: true,
+      email: emailLower,
+      found: true,
+      isEmail: true,
+    };
+  }
+
+  // 2. Built-in Admin shortcut
+  const cleanLower = clean.toLowerCase();
+  if (cleanLower === 'admin' || cleanLower === 'superadmin') {
+    return {
+      success: true,
+      email: 'admin@aura.local',
+      found: true,
+      isEmail: false,
+      employeeCode: 'EMP-001',
+      fullName: 'AURA Super Admin',
+    };
   }
 
   try {
@@ -26,29 +55,43 @@ export async function resolveEmailFromIdentifier(identifier: string): Promise<st
 
     const searchFilters = Array.from(new Set([upper, formattedCode, ...(padded ? [padded] : [])]));
 
-    // 1. Search employees by employee_code
+    // Check employees table by employee_code
     const { data: empByCode } = await admin
       .from('employees')
-      .select('email,employee_code')
+      .select('email,employee_code,full_name')
       .or(searchFilters.map((code) => `employee_code.ilike.${code}`).join(','))
       .limit(1);
 
     if (empByCode && empByCode.length > 0 && empByCode[0].email) {
-      return empByCode[0].email;
+      return {
+        success: true,
+        email: empByCode[0].email,
+        found: true,
+        isEmail: false,
+        employeeCode: empByCode[0].employee_code || formattedCode,
+        fullName: empByCode[0].full_name || undefined,
+      };
     }
 
-    // 2. Search employees by full_name or email
+    // Check employees by full_name or email
     const { data: empByName } = await admin
       .from('employees')
-      .select('email')
+      .select('email,employee_code,full_name')
       .or(`full_name.ilike.%${clean}%,email.ilike.%${clean}%`)
       .limit(1);
 
     if (empByName && empByName.length > 0 && empByName[0].email) {
-      return empByName[0].email;
+      return {
+        success: true,
+        email: empByName[0].email,
+        found: true,
+        isEmail: false,
+        employeeCode: empByName[0].employee_code || formattedCode,
+        fullName: empByName[0].full_name || undefined,
+      };
     }
 
-    // 3. Fallback: Search in auth users list
+    // Check auth users metadata
     const { data: authUsers } = await admin.auth.admin.listUsers();
     if (authUsers?.users) {
       const match = authUsers.users.find((u) => {
@@ -58,17 +101,31 @@ export async function resolveEmailFromIdentifier(identifier: string): Promise<st
         return (
           (uCode && searchFilters.includes(uCode)) ||
           uCode === upper ||
-          (uName && uName.includes(clean)) ||
-          (uEmail && uEmail.includes(clean))
+          (uName && uName.includes(cleanLower)) ||
+          (uEmail && uEmail.includes(cleanLower))
         );
       });
       if (match?.email) {
-        return match.email;
+        return {
+          success: true,
+          email: match.email,
+          found: true,
+          isEmail: false,
+          employeeCode: (match.user_metadata?.employee_code as string) || formattedCode,
+          fullName: (match.user_metadata?.full_name as string) || undefined,
+        };
       }
     }
-  } catch (err) {
-    console.warn('Error resolving employee code to email:', err);
+  } catch (err: any) {
+    console.warn('Error resolving employee code to email:', err?.message || err);
   }
 
-  return clean;
+  // Not found in database
+  return {
+    success: false,
+    email: '',
+    found: false,
+    isEmail: false,
+    error: `Employee ID "${clean.toUpperCase()}" was not found in the workspace. Please verify your ID or create an account.`,
+  };
 }

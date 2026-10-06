@@ -56,6 +56,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     employeesResult,
     expensesResult,
     myEmployeeResult,
+    todayAttendanceResult,
   ] = await Promise.all([
     supabase.from("deals").select("id,status,revenue_amount,closed_at,owner_employee_id").or(`closed_at.gte.${twelveWeeksAgo.toISOString()},status.eq.OPEN`),
     supabase.from("leads").select("id,title,estimated_value,priority,status,created_at,owner_employee_id,stage:pipeline_stages(name),owner:owner_employee_id(full_name)").order("updated_at", { ascending: false }).limit(20),
@@ -65,10 +66,11 @@ export async function getDashboardData(): Promise<DashboardData> {
     supabase.from("employees").select("id,full_name,role,status").eq("status", "ACTIVE").order("full_name"),
     supabase.from("expenses").select("id,amount,status").eq("status", "SUBMITTED"),
     supabase.from("employees").select("id,full_name,employee_code,role").eq("user_id", user.id).maybeSingle(),
+    supabase.from("attendance").select("id,employee_id,check_in_at,check_out_at,check_in_note,check_out_note").eq("attendance_date", today),
   ]);
 
-  for (const result of [dealsResult, leadsResult, visitsResult, tasksResult, sessionsResult, employeesResult, expensesResult]) {
-    if (result.error) console.warn("Dashboard query notice:", result.error.message);
+  for (const result of [dealsResult, leadsResult, visitsResult, tasksResult, sessionsResult, employeesResult, expensesResult, todayAttendanceResult]) {
+    if (result && "error" in result && result.error) console.warn("Dashboard query notice:", result.error.message);
   }
 
   const deals = dealsResult.data ?? [];
@@ -79,17 +81,11 @@ export async function getDashboardData(): Promise<DashboardData> {
   const employees = employeesResult.data ?? [];
   const expenses = expensesResult.data ?? [];
   const myEmployee = myEmployeeResult.data ?? null;
+  const allTodayAttendance = (todayAttendanceResult as any).data ?? [];
 
-  let todayAttendance: DashboardData["todayAttendance"] = null;
-  if (myEmployee) {
-    const { data: att } = await supabase
-      .from("attendance")
-      .select("id,status,check_in_at,check_out_at,check_in_note,check_out_note")
-      .eq("employee_id", myEmployee.id)
-      .eq("attendance_date", today)
-      .maybeSingle();
-    todayAttendance = att ?? null;
-  }
+  const todayAttendance: DashboardData["todayAttendance"] = myEmployee
+    ? allTodayAttendance.find((a: any) => a.employee_id === myEmployee.id) ?? null
+    : null;
 
   const wonThisMonth = deals.filter((d) => d.status === "WON" && d.closed_at && new Date(d.closed_at) >= monthStart && new Date(d.closed_at) < nextMonth);
   const openDeals = deals.filter((d) => d.status === "OPEN");
@@ -114,7 +110,9 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   const team = employees.map((employee) => {
     const activeVisit = visitByEmployee.get(employee.id);
-    const working = sessions.some((session) => session.employee_id === employee.id);
+    const empAtt = allTodayAttendance.find((a: any) => a.employee_id === employee.id);
+    const isAttActive = Boolean(empAtt && empAtt.check_in_at && !empAtt.check_out_at);
+    const working = sessions.some((session) => session.employee_id === employee.id) || isAttActive;
     return {
       id: employee.id,
       name: employee.full_name,
@@ -132,6 +130,9 @@ export async function getDashboardData(): Promise<DashboardData> {
     value: Number(lead.estimated_value ?? 0),
     priority: String(lead.priority),
   }));
+
+  const checkedInCurrently = allTodayAttendance.filter((a: any) => a.check_in_at && !a.check_out_at).length;
+  const totalCheckedInToday = allTodayAttendance.length;
 
   return {
     kpis: {
@@ -160,9 +161,9 @@ export async function getDashboardData(): Promise<DashboardData> {
     todayAttendance,
     adminAttendanceSummary: {
       totalEmployees: employees.length,
-      checkedInCount: sessions.length > 0 ? Math.max(sessions.length, (todayAttendance ? 1 : 0)) : (todayAttendance ? 1 : 0),
-      officeCount: (todayAttendance?.check_in_note || '').toUpperCase().includes('OFFICE') ? 1 : 0,
-      fieldCount: (todayAttendance && !(todayAttendance.check_in_note || '').toUpperCase().includes('OFFICE')) ? 1 : 0,
+      checkedInCount: checkedInCurrently || totalCheckedInToday,
+      officeCount: allTodayAttendance.filter((a: any) => String(a.check_in_note || '').toUpperCase().includes('OFFICE')).length,
+      fieldCount: allTodayAttendance.filter((a: any) => !String(a.check_in_note || '').toUpperCase().includes('OFFICE')).length,
     },
   };
 }
