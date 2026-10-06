@@ -49,19 +49,14 @@ export default function SignupPage() {
         return;
       }
 
-      // Auto sign-in with newly registered credentials
+      // Auto sign-in with newly registered credentials in background
       const supabase = createClient();
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
+      await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (!signInErr) {
-        window.location.href = "/";
-        return;
-      }
-
-      // If client sign-in needs a manual click, display assigned Employee Code
+      // Display assigned Employee Code so the user clearly sees their new ID!
       setSuccessInfo({
         code: res.employeeCode || "EMP-NEW",
         email,
@@ -148,12 +143,20 @@ export default function SignupPage() {
                     Linked to: {successInfo.email}
                   </p>
                 </div>
-                <Link
-                  href="/login"
-                  className="block w-full rounded-xl bg-[var(--navy)] py-3 text-sm font-bold text-white hover:bg-slate-800"
-                >
-                  Proceed to Sign In
-                </Link>
+                <div className="flex flex-col gap-2">
+                  <a
+                    href="/"
+                    className="block w-full rounded-xl bg-teal-600 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-teal-700"
+                  >
+                    Enter Workspace (Punch In) →
+                  </a>
+                  <Link
+                    href="/login"
+                    className="block w-full rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Sign In with ID
+                  </Link>
+                </div>
               </div>
             ) : (
               <>

@@ -50,20 +50,17 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/health") ||
     pathname.startsWith("/api/map/realtime");
 
-  if (!user && !isPublicRoute) {
+  if (isPublicRoute) {
+    return supabaseResponse;
+  }
+
+  if (!user) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  if (user && (pathname === "/login" || pathname === "/signup")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    url.search = "";
     return NextResponse.redirect(url);
   }
 
