@@ -20,9 +20,13 @@ function SubmitButton({ children }: { children: ReactNode }) {
   return <button disabled={pending} className="rounded-xl bg-[var(--navy)] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-[var(--navy-2)] disabled:cursor-not-allowed disabled:opacity-60">{pending ? "Saving…" : children}</button>;
 }
 
-function Result({ result }: { result: { error?: string; success?: boolean } | null }) {
+function Result({ result }: { result: { error?: string; success?: boolean; message?: string } | null }) {
   if (!result) return null;
-  return <p className={`mt-3 text-xs font-medium ${result.error ? "text-red-600" : "text-emerald-600"}`}>{result.error ?? "Saved successfully."}</p>;
+  return (
+    <div className={`mt-3 rounded-xl p-3 text-xs font-semibold ${result.error ? "bg-red-50 text-red-700 border border-red-200" : "bg-emerald-50 text-emerald-800 border border-emerald-200"}`}>
+      {result.error ?? result.message ?? "Saved successfully."}
+    </div>
+  );
 }
 
 export function CompanySetupForm() {
@@ -54,9 +58,21 @@ export function EmployeeForm({
   initial?: Employee;
   redirectTo?: string;
 }) {
-  const [result, setResult] = useState<{ error?: string; success?: boolean } | null>(null);
+  const [result, setResult] = useState<{ error?: string; success?: boolean; message?: string } | null>(null);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+
+  const nextEmployeeCode = (() => {
+    let max = 0;
+    for (const e of employees) {
+      const match = e.employee_code?.match(/EMP-(\d+)/i);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > max) max = n;
+      }
+    }
+    return `EMP-${String(max + 1).padStart(3, "0")}`;
+  })();
 
   const action = async (formData: FormData) => {
     const response = initial ? await updateEmployee(formData) : await createEmployee(formData);
@@ -64,25 +80,100 @@ export function EmployeeForm({
     if (response.success) {
       if (!initial) formRef.current?.reset();
       if (redirectTo) {
-        router.push(redirectTo);
+        setTimeout(() => {
+          router.push(redirectTo);
+          router.refresh();
+        }, 1200);
+      } else {
+        router.refresh();
       }
-      router.refresh();
     }
   };
 
-  return <form ref={formRef} action={action} className="grid gap-3 md:grid-cols-2">
-    {initial && <input type="hidden" name="id" value={initial.id} />}
-    <Field label="Full name"><input name="full_name" required defaultValue={initial?.full_name} className="input" placeholder="Rohit Kumar" /></Field>
-    <Field label="Employee code"><input name="employee_code" required={!initial} readOnly={Boolean(initial)} defaultValue={initial?.employee_code} className={`input ${initial ? "bg-slate-50" : ""}`} placeholder="EMP-002" /></Field>
-    <Field label="Email"><input name="email" type="email" defaultValue={initial?.email ?? ""} className="input" placeholder="rohit@company.com" /></Field>
-    <Field label="Phone"><input name="phone" defaultValue={initial?.phone ?? ""} className="input" placeholder="+91 98xxxxxx" /></Field>
-    <Field label="Designation"><input name="designation" defaultValue={initial?.designation ?? ""} className="input" placeholder="Sales Executive" /></Field>
-    <Field label="Role"><select name="role" defaultValue={initial?.role ?? "SALESMAN"} className="input">{roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></Field>
-    <Field label="Manager"><select name="manager_id" defaultValue={initial?.manager_id ?? ""} className="input"><option value="">No manager</option>{employees.filter((employee) => employee.id !== initial?.id).map((employee) => <option key={employee.id} value={employee.id}>{employee.full_name} · {employee.role.replaceAll("_", " ")}</option>)}</select></Field>
-    <Field label="Status"><select name="status" defaultValue={initial?.status ?? "INVITED"} className="input"><option value="INVITED">Invited</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></Field>
-    <Field label="Joined date"><input name="joined_at" type="date" defaultValue={initial?.joined_at ?? ""} className="input" /></Field>
-    <div className="md:col-span-2 flex items-center gap-3 pt-2"><SubmitButton>{initial ? "Save changes" : "Add employee"}</SubmitButton><Result result={result} /></div>
-  </form>;
+  return (
+    <form ref={formRef} action={action} className="grid gap-3 md:grid-cols-2">
+      {initial && <input type="hidden" name="id" value={initial.id} />}
+      <Field label="Full name">
+        <input name="full_name" required defaultValue={initial?.full_name} className="input" placeholder="e.g. Rahul Sharma" />
+      </Field>
+      <Field label="Employee code">
+        <input
+          name="employee_code"
+          required={!initial}
+          readOnly={Boolean(initial)}
+          defaultValue={initial?.employee_code ?? nextEmployeeCode}
+          className={`input font-mono font-bold ${initial ? "bg-slate-50" : "bg-teal-50/40 text-teal-900 border-teal-300"}`}
+          placeholder={nextEmployeeCode}
+        />
+      </Field>
+      <Field label="Email Address">
+        <input
+          name="email"
+          type="email"
+          defaultValue={initial?.email ?? ""}
+          className="input"
+          placeholder="rahul@company.com"
+        />
+      </Field>
+      {!initial && (
+        <Field label="Login Password">
+          <input
+            name="password"
+            type="text"
+            defaultValue="Password@123"
+            className="input font-mono"
+            placeholder="Initial password for login"
+          />
+        </Field>
+      )}
+      <Field label="Phone">
+        <input name="phone" defaultValue={initial?.phone ?? ""} className="input" placeholder="+91 98xxxxxx" />
+      </Field>
+      <Field label="Designation">
+        <input name="designation" defaultValue={initial?.designation ?? ""} className="input" placeholder="Sales Executive / Field Rep" />
+      </Field>
+      <Field label="Role">
+        <select name="role" defaultValue={initial?.role ?? "SALESMAN"} className="input">
+          {roles.map((role) => (
+            <option key={role.value} value={role.value}>
+              {role.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Manager">
+        <select name="manager_id" defaultValue={initial?.manager_id ?? ""} className="input">
+          <option value="">No manager</option>
+          {employees
+            .filter((employee) => employee.id !== initial?.id)
+            .map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.full_name} · {employee.role.replaceAll("_", " ")}
+              </option>
+            ))}
+        </select>
+      </Field>
+      <Field label="Status">
+        <select name="status" defaultValue={initial?.status ?? "ACTIVE"} className="input">
+          <option value="ACTIVE">Active (Can punch-in & log in)</option>
+          <option value="INVITED">Invited</option>
+          <option value="INACTIVE">Inactive</option>
+        </select>
+      </Field>
+      <Field label="Joined date">
+        <input
+          name="joined_at"
+          type="date"
+          defaultValue={initial?.joined_at ?? new Intl.DateTimeFormat("en-CA").format(new Date())}
+          className="input"
+        />
+      </Field>
+      <div className="md:col-span-2 flex flex-col gap-2 pt-2">
+        <SubmitButton>{initial ? "Save changes" : "Create Employee & Generate Login"}</SubmitButton>
+        <Result result={result} />
+      </div>
+    </form>
+  );
 }
 
 export function EmployeeDeleteForm({ id }: { id: string }) {

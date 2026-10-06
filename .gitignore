@@ -30,6 +30,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
+# mobile
+/mobile/node_modules/
+/mobile/.expo/
+/mobile/.env*
+
 # IDE and editors
 .vscode/
 .idea/

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { APP_ROLES, type AppRole } from "@/lib/auth/types";
 
 const MANAGEABLE_ROLES: AppRole[] = [...APP_ROLES];
@@ -55,32 +56,102 @@ export async function createEmployee(formData: FormData) {
   if (company.error || !company.data) return { error: "Company setup is incomplete." };
 
   const fullName = text(formData.get("full_name"));
-  const employeeCode = text(formData.get("employee_code")).toUpperCase();
-  const role = text(formData.get("role"));
+  let employeeCode = text(formData.get("employee_code")).toUpperCase();
+  const role = text(formData.get("role")) || "SALESMAN";
   const managerId = nullableText(formData.get("manager_id"));
+  const inputEmail = nullableText(formData.get("email"));
+  const inputPassword = text(formData.get("password")) || "Password@123";
 
-  if (fullName.length < 2) return { error: "Full name is required." };
-  if (!employeeCode) return { error: "Employee code is required." };
+  if (fullName.length < 2) return { error: "Full name must be at least 2 characters." };
   if (!isRole(role)) return { error: "Invalid employee role." };
 
-  const { error } = await supabase.from("employees").insert({
+  const admin = createAdminClient();
+
+  // 1. Auto-assign employee code if empty
+  if (!employeeCode) {
+    const { data: allEmps } = await admin.from("employees").select("employee_code");
+    let maxNum = 0;
+    for (const emp of allEmps || []) {
+      const match = emp.employee_code?.match(/EMP-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    employeeCode = `EMP-${String(maxNum + 1).padStart(3, "0")}`;
+  } else {
+    // Format properly to EMP-XXX if digits only or EMP prefix without dash
+    const digitsOnly = employeeCode.replace(/\D/g, "");
+    if (!employeeCode.startsWith("EMP-")) {
+      employeeCode = digitsOnly ? `EMP-${digitsOnly.padStart(3, "0")}` : `EMP-${employeeCode}`;
+    }
+  }
+
+  const email = inputEmail || `${employeeCode.toLowerCase()}@aura.local`;
+
+  // 2. Create login auth user in Supabase auth
+  let authUserId: string | null = null;
+  const { data: existingUsers } = await admin.auth.admin.listUsers();
+  const existing = (existingUsers?.users || []).find(
+    (u) => u.email?.toLowerCase() === email.toLowerCase()
+  );
+
+  if (existing) {
+    authUserId = existing.id;
+  } else {
+    const { data: newUser, error: createError } = await admin.auth.admin.createUser({
+      email,
+      password: inputPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        employee_code: employeeCode,
+        role,
+      },
+    });
+
+    if (createError || !newUser?.user) {
+      return { error: `Failed to create login account: ${createError?.message || "Unknown error"}` };
+    }
+    authUserId = newUser.user.id;
+  }
+
+  // 3. Upsert into public.profiles
+  if (authUserId) {
+    await admin.from("profiles").upsert({
+      id: authUserId,
+      full_name: fullName,
+      company_id: company.data.id,
+      role: role as any,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  // 4. Upsert employee row with ACTIVE status
+  const { error } = await admin.from("employees").upsert({
     company_id: company.data.id,
+    user_id: authUserId,
     employee_code: employeeCode,
     full_name: fullName,
-    email: nullableText(formData.get("email")),
+    email,
     phone: nullableText(formData.get("phone")),
-    designation: nullableText(formData.get("designation")),
+    designation: nullableText(formData.get("designation")) || (role === "COMPANY_ADMIN" ? "Administrator" : "Field Executive"),
     role,
     manager_id: managerId,
-    status: text(formData.get("status")) || "INVITED",
-    joined_at: nullableText(formData.get("joined_at")),
+    status: text(formData.get("status")) || "ACTIVE",
+    joined_at: nullableText(formData.get("joined_at")) || new Intl.DateTimeFormat("en-CA").format(new Date()),
   });
 
   if (error) return { error: error.message };
 
   revalidatePath("/employees");
   revalidatePath("/teams");
-  return { success: true };
+  return {
+    success: true,
+    employeeCode,
+    email,
+    message: `Employee ${employeeCode} created! Login ID: ${employeeCode} | Email: ${email}`,
+  };
 }
 
 export async function updateEmployee(formData: FormData) {

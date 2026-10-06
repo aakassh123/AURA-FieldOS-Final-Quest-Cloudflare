@@ -77,6 +77,14 @@ export function Topbar({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        <Link
+          href="/attendance"
+          className="flex items-center gap-1.5 rounded-xl border border-teal-200/80 bg-teal-50/50 px-2.5 py-1.5 text-xs font-bold text-teal-800 transition hover:bg-teal-100/60"
+          title="Daily Attendance & Shift Punch-in"
+        >
+          <span className="h-2 w-2 rounded-full bg-teal-500" />
+          <span className="hidden sm:inline">Attendance</span>
+        </Link>
         <NotificationBell />
         <Link
           href="/profile"

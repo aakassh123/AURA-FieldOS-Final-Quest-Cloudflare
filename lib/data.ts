@@ -3,6 +3,7 @@ export const navGroups = [
     label: "Overview",
     items: [
       { label: "Today", icon: "layout-dashboard", href: "/" },
+      { label: "Attendance & Shifts", icon: "calendar-check", href: "/attendance" },
       { label: "My Work", icon: "check-square", href: "/field" },
       { label: "Quest & Rewards", icon: "gift", href: "/rewards" },
     ],

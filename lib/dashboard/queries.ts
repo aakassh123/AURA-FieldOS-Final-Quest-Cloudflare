@@ -7,6 +7,14 @@ export type DashboardData = {
   leads: { id: string; title: string; owner: string | null; stage: string | null; value: number; priority: string }[];
   team: { id: string; name: string; role: string; state: "On visit" | "Working" | "Offline"; customer: string | null }[];
   pendingExpenses: { count: number; amount: number };
+  todayAttendance: {
+    id: string;
+    status: string;
+    check_in_at: string | null;
+    check_out_at: string | null;
+    check_in_note: string | null;
+    check_out_note: string | null;
+  } | null;
 };
 
 function dateOnly(date: Date) {
@@ -26,6 +34,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Authentication required");
 
+  const today = new Intl.DateTimeFormat("en-CA").format(new Date());
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
@@ -40,6 +49,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     sessionsResult,
     employeesResult,
     expensesResult,
+    myEmployeeResult,
   ] = await Promise.all([
     supabase.from("deals").select("id,status,revenue_amount,closed_at,owner_employee_id").or(`closed_at.gte.${twelveWeeksAgo.toISOString()},status.eq.OPEN`),
     supabase.from("leads").select("id,title,estimated_value,priority,status,created_at,owner_employee_id,stage:pipeline_stages(name),owner:owner_employee_id(full_name)").order("updated_at", { ascending: false }).limit(20),
@@ -48,6 +58,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     supabase.from("work_sessions").select("id,employee_id,status,started_at,ended_at").eq("status", "ACTIVE"),
     supabase.from("employees").select("id,full_name,role,status").eq("status", "ACTIVE").order("full_name"),
     supabase.from("expenses").select("id,amount,status").eq("status", "SUBMITTED"),
+    supabase.from("employees").select("id,full_name,employee_code,role").eq("user_id", user.id).maybeSingle(),
   ]);
 
   for (const result of [dealsResult, leadsResult, visitsResult, tasksResult, sessionsResult, employeesResult, expensesResult]) {
@@ -61,6 +72,18 @@ export async function getDashboardData(): Promise<DashboardData> {
   const sessions = sessionsResult.data ?? [];
   const employees = employeesResult.data ?? [];
   const expenses = expensesResult.data ?? [];
+  const myEmployee = myEmployeeResult.data ?? null;
+
+  let todayAttendance: DashboardData["todayAttendance"] = null;
+  if (myEmployee) {
+    const { data: att } = await supabase
+      .from("attendance")
+      .select("id,status,check_in_at,check_out_at,check_in_note,check_out_note")
+      .eq("employee_id", myEmployee.id)
+      .eq("attendance_date", today)
+      .maybeSingle();
+    todayAttendance = att ?? null;
+  }
 
   const wonThisMonth = deals.filter((d) => d.status === "WON" && d.closed_at && new Date(d.closed_at) >= monthStart && new Date(d.closed_at) < nextMonth);
   const openDeals = deals.filter((d) => d.status === "OPEN");
@@ -128,5 +151,6 @@ export async function getDashboardData(): Promise<DashboardData> {
       count: expenses.length,
       amount: expenses.reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0),
     },
+    todayAttendance,
   };
 }
