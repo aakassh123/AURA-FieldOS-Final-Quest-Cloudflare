@@ -44,12 +44,25 @@ export default async function CommissionsPage() {
               </thead>
               <tbody>
                 {commissions.map((c: any) => (
-                  <tr key={c.id} className="border-b border-slate-100">
-                    <td className="py-3">{String(c.employee_id).slice(0, 8)}</td>
+                  <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                    <td className="py-3">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-900">
+                          {c.employee?.full_name || 'Staff Member'}
+                        </span>
+                        <span className="font-mono text-[10px] font-semibold text-teal-700">
+                          {c.employee?.employee_code || 'EMP'}
+                        </span>
+                      </div>
+                    </td>
                     <td>₹{Number(c.revenue_amount).toLocaleString('en-IN')}</td>
                     <td>{c.rate_percent}%</td>
-                    <td className="font-semibold">₹{Number(c.commission_amount).toLocaleString('en-IN')}</td>
-                    <td><span className="badge">{c.status}</span></td>
+                    <td className="font-semibold text-slate-950">₹{Number(c.commission_amount).toLocaleString('en-IN')}</td>
+                    <td>
+                      <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                        {c.status}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

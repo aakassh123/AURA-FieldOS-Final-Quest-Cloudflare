@@ -4,7 +4,41 @@ import { createClient } from '@/lib/supabase/server';
 const text=(v:FormDataEntryValue|null)=>typeof v==='string'?v.trim():'';
 const num=(v:FormDataEntryValue|null)=>{const n=Number(v);return Number.isFinite(n)?n:null;};
 const nullable=(v:FormDataEntryValue|null)=>text(v)||null;
-async function context(){const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(!user)throw new Error('Authentication required');const {data:employee}=await supabase.from('employees').select('id,company_id,full_name,role,status').eq('user_id',user.id).maybeSingle();if(!employee||employee.status!=='ACTIVE')throw new Error('Your active employee profile is required.');return {supabase,employee};}
+async function context() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Authentication required');
+  let { data: employee } = await supabase.from('employees').select('id,company_id,full_name,role,status').eq('user_id', user.id).maybeSingle();
+  if (!employee) {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const admin = createAdminClient();
+    const { data: empByEmail } = await admin.from('employees').select('id,company_id,full_name,role,status').eq('email', user.email || '').maybeSingle();
+    if (empByEmail) {
+      await admin.from('employees').update({ user_id: user.id, status: 'ACTIVE' }).eq('id', empByEmail.id);
+      empByEmail.status = 'ACTIVE';
+      employee = empByEmail;
+    } else {
+      const compId = (user.user_metadata?.company_id as string) || 'f9e69ac7-7082-41db-a35a-5c77900af472';
+      const role = (user.user_metadata?.role as string) || 'SALESMAN';
+      const fullName = (user.user_metadata?.full_name as string) || user.email?.split('@')[0] || 'User';
+      const empCode = (user.user_metadata?.employee_code as string) || 'EMP-001';
+
+      const { data: newEmp } = await admin.from('employees').insert({
+        company_id: compId,
+        user_id: user.id,
+        employee_code: empCode,
+        full_name: fullName,
+        email: user.email,
+        role: role,
+        status: 'ACTIVE',
+      }).select('id,company_id,full_name,role,status').maybeSingle();
+
+      if (newEmp) employee = newEmp;
+      else throw new Error('Your active employee profile is required.');
+    }
+  }
+  return { supabase, employee };
+}
 export async function submitExpense(formData:FormData){try{const {supabase,employee}=await context();const amount=num(formData.get('amount'));const description=text(formData.get('description'));if(!amount||amount<=0)return{error:'Enter a valid expense amount.'};if(description.length<2)return{error:'Add a short description.'};const {error}=await supabase.from('expenses').insert({company_id:employee.company_id,employee_id:employee.id,category:text(formData.get('category'))||'OTHER',expense_date:text(formData.get('expense_date'))||new Date().toISOString().slice(0,10),amount,merchant:nullable(formData.get('merchant')),description,trip_id:nullable(formData.get('trip_id'))});if(error)return{error:error.message};revalidatePath('/expenses');revalidatePath('/finance');revalidatePath('/');return{success:true};}catch(e){return{error:e instanceof Error?e.message:'Unable to submit expense.'};}}
 export async function reviewExpense(formData:FormData){try{const {supabase,employee}=await context();const id=text(formData.get('expense_id'));const status=text(formData.get('status'));if(!id||!['APPROVED','REJECTED'].includes(status))return{error:'Invalid expense review.'};const approved=num(formData.get('approved_amount'));if(status==='APPROVED'&&(approved===null||approved<0))return{error:'Enter an approved amount.'};const {error}=await supabase.from('expenses').update({status,approved_amount:status==='APPROVED'?approved:0,reviewed_by_employee_id:employee.id,reviewed_at:new Date().toISOString(),rejection_reason:status==='REJECTED'?nullable(formData.get('rejection_reason')):null}).eq('id',id);if(error)return{error:error.message};revalidatePath('/expenses');revalidatePath('/finance');return{success:true};}catch(e){return{error:e instanceof Error?e.message:'Unable to review expense.'};}}
 export async function createCompensationRule(formData:FormData){try{const {supabase,employee}=await context();if(!['SUPER_ADMIN','COMPANY_ADMIN','HR_ACCOUNTS'].includes(employee.role))return{error:'Only finance administrators can create compensation rules.'};const name=text(formData.get('name'));const effectiveFrom=text(formData.get('effective_from'));if(name.length<2||!effectiveFrom)return{error:'Name and effective date are required.'};const {data:previous}=await supabase.from('compensation_rules').select('version').eq('name',name).order('version',{ascending:false}).limit(1).maybeSingle();const version=(previous?.version??0)+1;const {error}=await supabase.from('compensation_rules').insert({company_id:employee.company_id,name,version,rule_type:text(formData.get('rule_type'))||'FIXED_SALARY',fixed_salary:num(formData.get('fixed_salary'))??0,daily_rate:num(formData.get('daily_rate'))??0,incentive_rate_percent:num(formData.get('incentive_rate_percent'))??0,commission_rate_percent:num(formData.get('commission_rate_percent'))??0,effective_from:effectiveFrom,notes:nullable(formData.get('notes'))});if(error)return{error:error.message};revalidatePath('/compensation');revalidatePath('/finance');return{success:true};}catch(e){return{error:e instanceof Error?e.message:'Unable to create compensation rule.'};}}

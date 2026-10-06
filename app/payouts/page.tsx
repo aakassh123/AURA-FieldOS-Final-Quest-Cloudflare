@@ -85,12 +85,22 @@ export default async function PayoutsPage() {
           <h2 className="section-title">Payout history</h2>
           <div className="mt-4 space-y-3">
             {payouts.map((p: any) => (
-              <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+              <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4.5 shadow-sm transition hover:bg-slate-50/60">
                 <div>
-                  <p className="font-semibold">Employee {String(p.employee_id).slice(0, 8)}</p>
-                  <p className="text-xs text-slate-500">{p.period_start} → {p.period_end} · {p.status}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-slate-900">{p.employee?.full_name || 'Staff Member'}</p>
+                    <span className="font-mono text-[10px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                      {p.employee?.employee_code || 'EMP'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Period: {p.period_start} → {p.period_end} · <span className="font-semibold text-slate-700">{p.status}</span>
+                  </p>
                 </div>
-                <p className="text-lg font-bold">₹{Number(p.net_amount).toLocaleString('en-IN')}</p>
+                <div className="text-right">
+                  <p className="text-xs text-slate-400 font-semibold uppercase">Net Payout</p>
+                  <p className="text-lg font-black text-slate-950">₹{Number(p.net_amount).toLocaleString('en-IN')}</p>
+                </div>
               </div>
             ))}
             {!payouts.length && <p className="muted mt-3">No payouts yet.</p>}

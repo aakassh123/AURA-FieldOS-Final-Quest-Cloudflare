@@ -20,9 +20,9 @@ export const navGroups = [
     label: "Field Work",
     items: [
       { label: "Live Map", icon: "map", href: "/map" },
-      { label: "Attendance", icon: "calendar-check", href: "/attendance" },
-      { label: "Trips", icon: "route", href: "/trips" },
-      { label: "Expenses", icon: "receipt", href: "/expenses" },
+      { label: "Visits", icon: "map-pin", href: "/visits" },
+      { label: "Trips & Distance", icon: "route", href: "/trips" },
+      { label: "Expense Claims", icon: "receipt", href: "/expenses" },
     ],
   },
   {

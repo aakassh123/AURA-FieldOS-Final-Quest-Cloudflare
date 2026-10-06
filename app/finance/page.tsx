@@ -110,19 +110,27 @@ function List({
     <div className="surface">
       <h2 className="section-title">{title}</h2>
       <div className="mt-4 space-y-3">
-        {rows.slice(0, 8).map((r: any) => (
-          <div key={r.id} className="flex justify-between rounded-xl border border-slate-200 p-3">
-            <div>
-              <p className="text-sm font-semibold">
-                {labelKey === 'employee_id'
-                  ? `Employee ${String(r[labelKey]).slice(0, 8)}`
-                  : r[labelKey]}
-              </p>
-              <p className="text-xs text-slate-500">{r.status}</p>
+        {rows.slice(0, 8).map((r: any) => {
+          const empLabel = r.employee?.full_name
+            ? `${r.employee.full_name} (${r.employee.employee_code || 'EMP'})`
+            : r.owner?.full_name
+            ? `${r.owner.full_name} (${r.owner.employee_code || 'EMP'})`
+            : `Employee ${String(r[labelKey] || '').slice(0, 8)}`;
+
+          return (
+            <div key={r.id} className="flex justify-between rounded-xl border border-slate-200 p-3">
+              <div>
+                <p className="text-sm font-semibold">
+                  {labelKey === 'employee_id' || labelKey === 'owner_employee_id'
+                    ? empLabel
+                    : r[labelKey]}
+                </p>
+                <p className="text-xs text-slate-500">{r.status}</p>
+              </div>
+              <p className="font-bold">{money(Number(r[valueKey]))}</p>
             </div>
-            <p className="font-bold">{money(Number(r[valueKey]))}</p>
-          </div>
-        ))}
+          );
+        })}
         {!rows.length && <p className="muted">Nothing here yet.</p>}
       </div>
     </div>
