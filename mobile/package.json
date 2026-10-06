@@ -1,0 +1,33 @@
+{
+  "name": "aura-fieldos-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit",
+    "lint": "expo lint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.76.1",
+    "expo": "^55.0.0",
+    "expo-device": "^7.0.0",
+    "expo-location": "^19.0.0",
+    "expo-network": "^8.0.0",
+    "expo-notifications": "^0.31.0",
+    "expo-router": "^5.0.0",
+    "expo-sqlite": "^16.0.0",
+    "expo-status-bar": "~2.0.0",
+    "lucide-react-native": "^0.468.0",
+    "react": "19.2.0",
+    "react-native": "0.83.0",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.0.10",
+    "typescript": "~5.8.3"
+  }
+}

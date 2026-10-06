@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "AURA FieldOS",
+    "slug": "aura-fieldos-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "aurafieldos",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aura.fieldos.mobile"
+    },
+    "android": {
+      "package": "com.aura.fieldos.mobile",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "AURA uses your location to verify attendance, customer visits, and field work.",
+          "locationAlwaysAndWhenInUsePermission": "AURA uses your location during an active field-work session to record authorized work travel and verify visits."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#14B8A6"
+        }
+      ],
+      "expo-router"
+    ],
+    "extra": {
+      "eas": {}
+    }
+  }
+}

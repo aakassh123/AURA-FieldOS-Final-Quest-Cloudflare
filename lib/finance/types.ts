@@ -1,0 +1,9 @@
+export type ExpenseStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PAID';
+export type ExpenseCategory = 'TRAVEL' | 'FUEL' | 'MEALS' | 'LODGING' | 'PHONE' | 'OFFICE' | 'OTHER';
+export type DealStatus = 'OPEN' | 'WON' | 'LOST' | 'CANCELLED';
+export type CompensationRuleType = 'FIXED_SALARY' | 'PER_DAY' | 'FIXED_PLUS_INCENTIVE' | 'COMMISSION' | 'HYBRID';
+export type CommissionStatus = 'CALCULATED' | 'APPROVED' | 'PAID' | 'VOID';
+export type PayoutStatus = 'DRAFT' | 'READY' | 'APPROVED' | 'PAID' | 'VOID';
+export type Expense = { id: string; employee_id: string; category: ExpenseCategory; status: ExpenseStatus; expense_date: string; amount: number; approved_amount: number | null; merchant: string | null; description: string; rejection_reason: string | null; };
+export type FinanceEmployee = { id: string; full_name: string; role: string; status: string };
+export type CompensationRule = { id: string; name: string; version: number; rule_type: CompensationRuleType; fixed_salary: number; daily_rate: number; incentive_rate_percent: number; commission_rate_percent: number; effective_from: string; effective_to: string | null; is_active: boolean; };
