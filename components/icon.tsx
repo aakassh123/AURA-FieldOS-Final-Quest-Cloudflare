@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   BarChart3,
   Bell,
   BellOff,
@@ -26,12 +27,14 @@ import {
   Menu,
   Percent,
   Plus,
+  Printer,
   Receipt,
   Route,
   Search,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
+  Target,
   TrendingUp,
   Trophy,
   UserRound,
@@ -48,6 +51,7 @@ import {
 } from "lucide-react";
 
 const icons: Record<string, LucideIcon> = {
+  activity: Activity,
   eye: Eye,
   "eye-off": EyeOff,
   "layout-dashboard": LayoutDashboard,
@@ -58,6 +62,7 @@ const icons: Record<string, LucideIcon> = {
   "map-pin": MapPin,
   "map-pin-check": MapPinCheck,
   map: Map,
+  printer: Printer,
   route: Route,
   receipt: Receipt,
   "chart-no-axes-combined": ChartNoAxesCombined,
@@ -68,6 +73,7 @@ const icons: Record<string, LucideIcon> = {
   plus: Plus,
   settings: Settings,
   "circle-help": CircleHelp,
+  target: Target,
   "user-round": UserRound,
   "chevron-down": ChevronDown,
   "shield-check": ShieldCheck,
@@ -94,7 +100,17 @@ const icons: Record<string, LucideIcon> = {
   "check-circle-2": CheckCircle2,
 };
 
-export function Icon({ name, size = 18, strokeWidth = 1.8, className }: { name: string; size?: number; strokeWidth?: number; className?: string }) {
+export function Icon({
+  name,
+  size = 18,
+  strokeWidth = 1.8,
+  className,
+}: {
+  name: string;
+  size?: number;
+  strokeWidth?: number;
+  className?: string;
+}) {
   const Component = icons[name] ?? CircleHelp;
   return <Component size={size} strokeWidth={strokeWidth} className={className} aria-hidden="true" />;
 }

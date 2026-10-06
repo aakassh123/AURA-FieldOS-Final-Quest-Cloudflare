@@ -44,14 +44,20 @@ button { cursor: pointer; }
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   background: #fff;
-  padding: 0.65rem 0.75rem;
-  font-size: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
   color: var(--text);
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 .input::placeholder { color: #94a3b8; }
 .input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(20,184,166,0.12); }
+@media (max-width: 640px) {
+  .input {
+    font-size: 16px;
+    padding: 0.75rem 0.875rem;
+  }
+}
 .aura-map-marker { border: 0; box-shadow: 0 8px 20px rgba(15,23,42,.18); }
 .aura-map-employee { width: 42px; height: 42px; border-radius: 999px; background: var(--navy); color: white; display:grid; place-items:center; border: 3px solid white; position: relative; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: pointer; }
 .aura-map-employee:hover { transform: scale(1.15); z-index: 50; }
