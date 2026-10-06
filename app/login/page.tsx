@@ -119,11 +119,6 @@ function LoginForm() {
     }
   }
 
-  // Quick fill helper for convenience
-  const fillCredentials = (id: string) => {
-    setIdentifier(id);
-    setError("");
-  };
 
   return (
     <main className="min-h-screen bg-[var(--page)] lg:grid lg:grid-cols-[1.05fr_0.95fr]">
@@ -295,35 +290,7 @@ function LoginForm() {
               </button>
             </form>
 
-            {/* Quick Login Test Chips */}
-            <div className="mt-5 border-t border-slate-100 pt-4">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Quick Test Identifiers:
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => fillCredentials("EMP-001")}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-900 transition"
-                >
-                  EMP-001 (Admin)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillCredentials("EMP-004")}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-900 transition"
-                >
-                  EMP-004 (Aman)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillCredentials("EMP-002")}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-900 transition"
-                >
-                  EMP-002 (Ayushman)
-                </button>
-              </div>
-            </div>
+
 
             <p className="mt-6 text-center text-xs text-slate-500">
               New employee or need an account?{" "}

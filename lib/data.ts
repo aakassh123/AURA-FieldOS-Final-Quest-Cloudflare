@@ -13,7 +13,6 @@ export const navGroups = [
     items: [
       { label: "Leads", icon: "users", href: "/leads" },
       { label: "Customers", icon: "building-2", href: "/customers" },
-      { label: "Visits", icon: "map-pin", href: "/visits" },
     ],
   },
   {
@@ -51,8 +50,7 @@ export const navGroups = [
   {
     label: "Insights",
     items: [
-      { label: "Performance", icon: "chart-no-axes-combined", href: "/reports" },
-      { label: "Reports", icon: "file-bar-chart", href: "/reports" },
+      { label: "Reports & Analytics", icon: "chart-no-axes-combined", href: "/reports" },
     ],
   },
 ];
