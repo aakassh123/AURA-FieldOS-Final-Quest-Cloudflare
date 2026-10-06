@@ -15,6 +15,12 @@ export type DashboardData = {
     check_in_note: string | null;
     check_out_note: string | null;
   } | null;
+  adminAttendanceSummary?: {
+    totalEmployees: number;
+    checkedInCount: number;
+    officeCount: number;
+    fieldCount: number;
+  };
 };
 
 function dateOnly(date: Date) {
@@ -152,5 +158,11 @@ export async function getDashboardData(): Promise<DashboardData> {
       amount: expenses.reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0),
     },
     todayAttendance,
+    adminAttendanceSummary: {
+      totalEmployees: employees.length,
+      checkedInCount: sessions.length > 0 ? Math.max(sessions.length, (todayAttendance ? 1 : 0)) : (todayAttendance ? 1 : 0),
+      officeCount: (todayAttendance?.check_in_note || '').toUpperCase().includes('OFFICE') ? 1 : 0,
+      fieldCount: (todayAttendance && !(todayAttendance.check_in_note || '').toUpperCase().includes('OFFICE')) ? 1 : 0,
+    },
   };
 }

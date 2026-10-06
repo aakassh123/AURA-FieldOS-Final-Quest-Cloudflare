@@ -10,6 +10,12 @@ export type Attendance = {
   check_in_accuracy_m: number | null;
   check_in_note?: string | null;
   check_out_note?: string | null;
+  employee?: {
+    id: string;
+    full_name: string;
+    employee_code: string;
+    role: string;
+  } | null;
 };
 
 export type WorkSession = {

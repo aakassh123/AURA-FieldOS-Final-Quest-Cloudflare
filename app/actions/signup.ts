@@ -9,11 +9,22 @@ export interface RegisterResult {
   email?: string;
 }
 
+function normalizeRole(
+  roleInput: string
+): 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'SALES_MANAGER' | 'SALESMAN' | 'HR_ACCOUNTS' {
+  const upper = roleInput.toUpperCase();
+  if (upper.includes('ADMIN')) return 'COMPANY_ADMIN';
+  if (upper.includes('MANAGER')) return 'SALES_MANAGER';
+  if (upper.includes('HR') || upper.includes('ACCOUNT')) return 'HR_ACCOUNTS';
+  return 'SALESMAN';
+}
+
 export async function registerUser(formData: FormData): Promise<RegisterResult> {
   const fullName = String(formData.get('full_name') || '').trim();
   const email = String(formData.get('email') || '').trim().toLowerCase();
   const password = String(formData.get('password') || '');
-  const role = String(formData.get('role') || 'FIELD_OFFICER').trim();
+  const roleRaw = String(formData.get('role') || 'SALESMAN').trim();
+  const validRole = normalizeRole(roleRaw);
 
   if (!fullName || fullName.length < 2) {
     return { error: 'Full name must be at least 2 characters.' };
@@ -37,34 +48,43 @@ export async function registerUser(formData: FormData): Promise<RegisterResult> 
       return { error: 'An account with this email already exists. Please sign in instead.' };
     }
 
-    // 2. Fetch default company
+    // 2. Fetch primary company (AURA Technologies)
     const { data: companies } = await admin
       .from('companies')
       .select('id, name')
       .order('created_at', { ascending: true })
       .limit(1);
 
-    const defaultCompany = companies?.[0] || null;
+    const defaultCompany = companies?.[0] || {
+      id: 'f9e69ac7-7082-41db-a35a-5c77900af472',
+      name: 'AURA Technologies',
+    };
 
-    // 3. Compute next employee code (e.g. EMP-003)
-    let nextCode = 'EMP-001';
+    // 3. Compute next employee code (scan employees and auth users to guarantee uniqueness)
+    let maxNum = 0;
     const { data: allEmployees } = await admin
       .from('employees')
       .select('employee_code');
 
-    if (allEmployees && allEmployees.length > 0) {
-      let maxNum = 0;
-      for (const emp of allEmployees) {
-        const match = emp.employee_code?.match(/EMP-(\d+)/i);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (num > maxNum) maxNum = num;
-        }
+    for (const emp of allEmployees || []) {
+      const match = emp.employee_code?.match(/EMP-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
       }
-      nextCode = `EMP-${String(maxNum + 1).padStart(3, '0')}`;
     }
 
-    // 4. Create user with admin privileges (bypasses email rate limits & auto-confirms)
+    for (const u of existingUsers?.users || []) {
+      const match = (u.user_metadata?.employee_code as string)?.match(/EMP-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+
+    const nextCode = `EMP-${String(maxNum + 1).padStart(3, '0')}`;
+
+    // 4. Create user in Supabase auth (pre-confirmed, metadata attached)
     const { data: newUser, error: createError } = await admin.auth.admin.createUser({
       email,
       password,
@@ -72,7 +92,9 @@ export async function registerUser(formData: FormData): Promise<RegisterResult> 
       user_metadata: {
         full_name: fullName,
         employee_code: nextCode,
-        company_name: defaultCompany?.name || 'AURA Technologies',
+        role: validRole,
+        company_id: defaultCompany.id,
+        company_name: defaultCompany.name,
       },
     });
 
@@ -82,32 +104,46 @@ export async function registerUser(formData: FormData): Promise<RegisterResult> 
 
     const userId = newUser.user.id;
 
-    // 5. Update public.profiles
-    if (defaultCompany) {
-      await admin
-        .from('profiles')
-        .upsert({
-          id: userId,
-          full_name: fullName,
-          company_id: defaultCompany.id,
-          role: role as any,
-          updated_at: new Date().toISOString(),
-        });
+    // 5. Upsert public.profiles
+    const { error: profErr } = await admin
+      .from('profiles')
+      .upsert({
+        id: userId,
+        full_name: fullName,
+        company_id: defaultCompany.id,
+        role: validRole,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      });
 
-      // 6. Insert public.employees
-      await admin
-        .from('employees')
-        .upsert({
-          company_id: defaultCompany.id,
-          user_id: userId,
-          employee_code: nextCode,
-          full_name: fullName,
-          email,
-          role: role as any,
-          designation: role === 'COMPANY_ADMIN' ? 'Administrator' : 'Field Executive',
-          joined_at: new Date().toISOString(),
-          is_active: true,
-        });
+    if (profErr) {
+      console.warn('Profile upsert warning:', profErr.message);
+    }
+
+    // 6. Upsert public.employees
+    const { error: empErr } = await admin
+      .from('employees')
+      .upsert({
+        company_id: defaultCompany.id,
+        user_id: userId,
+        employee_code: nextCode,
+        full_name: fullName,
+        email,
+        role: validRole,
+        designation:
+          validRole === 'COMPANY_ADMIN'
+            ? 'Administrator'
+            : validRole === 'SALES_MANAGER'
+            ? 'Sales Manager'
+            : validRole === 'HR_ACCOUNTS'
+            ? 'HR & Accounts Executive'
+            : 'Field Executive',
+        status: 'ACTIVE',
+        joined_at: new Intl.DateTimeFormat('en-CA').format(new Date()),
+      });
+
+    if (empErr) {
+      console.warn('Employee upsert warning:', empErr.message);
     }
 
     return {

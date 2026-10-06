@@ -23,10 +23,25 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   ]);
 
   if (profRes.data) {
+    let companyId = profRes.data.company_id;
+    if (!companyId) {
+      const { data: companies } = await supabase
+        .from("companies")
+        .select("id")
+        .order("created_at", { ascending: true })
+        .limit(1);
+      companyId = companies?.[0]?.id || "f9e69ac7-7082-41db-a35a-5c77900af472";
+      await supabase.from("profiles").update({ company_id: companyId }).eq("id", user.id);
+    }
+
     return {
       ...profRes.data,
+      company_id: companyId,
       avatar_url: (user.user_metadata?.avatar_url as string) || null,
-      employee_code: empRes.data?.employee_code || (user.user_metadata?.employee_code as string) || null,
+      employee_code:
+        empRes.data?.employee_code ||
+        (user.user_metadata?.employee_code as string) ||
+        null,
       designation: empRes.data?.designation || null,
       phone: empRes.data?.phone || null,
     } as Profile;

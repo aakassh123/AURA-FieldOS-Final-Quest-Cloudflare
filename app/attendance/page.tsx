@@ -14,8 +14,14 @@ export default async function AttendancePage() {
   const data = await getFieldDashboard();
   const today = new Intl.DateTimeFormat('en-CA').format(new Date());
 
-  const todayAttendance = data.attendance.find((a) => a.attendance_date === today) ?? null;
-  const activeSession = data.sessions.find((s) => s.status === 'ACTIVE') ?? null;
+  const todayAttendance =
+    data.attendance.find(
+      (a) => a.attendance_date === today && a.employee_id === data.employee?.id
+    ) ?? null;
+  const activeSession =
+    data.sessions.find(
+      (s) => s.status === 'ACTIVE' && s.employee_id === data.employee?.id
+    ) ?? null;
 
   return (
     <CrmShell
@@ -45,15 +51,33 @@ export default async function AttendancePage() {
 
         {/* History Log Table */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 p-5">
-            <h2 className="text-sm font-bold text-slate-900">Attendance Log History</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Verified audit trail of check-ins, office days, and overtime runs.</p>
+          <div className="flex flex-col gap-2 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900">Company Attendance Log History</h2>
+                <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-[10px] font-bold text-teal-800">
+                  {data.attendance.length} Total Punches
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Verified audit trail of check-ins, employee selfies, and live GPS accuracy.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1 font-bold text-emerald-800">
+                🏢 {data.attendance.filter(a => String(a.check_in_note || '').toUpperCase().includes('OFFICE')).length} Office
+              </span>
+              <span className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-1 font-bold text-blue-800">
+                🚗 {data.attendance.filter(a => !String(a.check_in_note || '').toUpperCase().includes('OFFICE')).length} Field
+              </span>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left">
+            <table className="w-full min-w-[850px] text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  <th className="p-4">Employee</th>
                   <th className="p-4">Date</th>
                   <th className="p-4">Photo Selfie</th>
                   <th className="p-4">Workplace Mode</th>
@@ -72,8 +96,21 @@ export default async function AttendancePage() {
                   const photoMatch = a.check_in_note?.match(/PHOTO:([^\s|]+)/);
                   const photoUrl = photoMatch ? photoMatch[1] : null;
 
+                  const emp = (Array.isArray(a.employee) ? a.employee[0] : a.employee) as any;
+
                   return (
                     <tr key={a.id} className="hover:bg-slate-50/60">
+                      <td className="p-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-900">
+                            {emp?.full_name || 'Staff Member'}
+                          </span>
+                          <span className="font-mono text-[10px] font-semibold text-teal-700">
+                            {emp?.employee_code || 'EMP'}
+                          </span>
+                        </div>
+                      </td>
+
                       <td className="p-4 font-semibold text-slate-800">
                         {new Date(a.attendance_date + 'T00:00:00').toLocaleDateString('en-IN', {
                           dateStyle: 'medium',
@@ -157,7 +194,7 @@ export default async function AttendancePage() {
 
                 {!data.attendance.length && (
                   <tr>
-                    <td colSpan={8} className="p-12 text-center text-sm text-slate-400">
+                    <td colSpan={9} className="p-12 text-center text-sm text-slate-400">
                       No attendance records found yet.
                     </td>
                   </tr>

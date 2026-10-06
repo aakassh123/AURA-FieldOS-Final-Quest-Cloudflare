@@ -570,6 +570,70 @@ export function Dashboard({
         />
       </section>
 
+      {/* Admin Workforce & Live Attendance Monitor */}
+      {management && (
+        <section className="mt-4 rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50/60 via-white to-slate-50 p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-teal-800">
+                  Admin Command Console
+                </span>
+                <span className="text-xs font-bold text-slate-800">Company Workforce & Shift Monitor</span>
+              </div>
+              <p className="mt-1 text-xs text-slate-600">
+                You have administrative visibility across all {data.team.length} company employees, live GPS locations, and verified customer visits.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/attendance"
+                className="rounded-xl bg-teal-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-teal-700"
+              >
+                👥 All Attendance & Selfies →
+              </Link>
+              <Link
+                href="/map"
+                className="rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                🗺️ Live Map Tracking
+              </Link>
+              <Link
+                href="/employees"
+                className="rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                🪪 Staff Directory & Codes
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl bg-white p-3 border border-slate-200">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Staff</p>
+              <p className="mt-1 text-lg font-black text-slate-900">{data.team.length} Employees</p>
+            </div>
+            <div className="rounded-xl bg-white p-3 border border-slate-200">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Today&apos;s Punches</p>
+              <p className="mt-1 text-lg font-black text-emerald-600">
+                {data.adminAttendanceSummary?.checkedInCount ?? 0} Checked In
+              </p>
+            </div>
+            <div className="rounded-xl bg-white p-3 border border-slate-200">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Visits</p>
+              <p className="mt-1 text-lg font-black text-blue-600">
+                {data.team.filter((t) => t.state === "On visit").length} On Site
+              </p>
+            </div>
+            <div className="rounded-xl bg-white p-3 border border-slate-200">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Field Working</p>
+              <p className="mt-1 text-lg font-black text-purple-600">
+                {data.team.filter((t) => t.state === "Working").length} Active Shift
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Performance & Team activity */}
       <section className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_1fr]">
         <Performance values={data.performance} />

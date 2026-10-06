@@ -12,7 +12,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState("FIELD_OFFICER");
+  const [role, setRole] = useState("SALESMAN");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -206,7 +206,7 @@ export default function SignupPage() {
                       onChange={(e) => setRole(e.target.value)}
                       className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-50"
                     >
-                      <option value="FIELD_OFFICER">Field Officer / Sales Representative</option>
+                      <option value="SALESMAN">Field Officer / Sales Representative</option>
                       <option value="SALES_MANAGER">Sales Manager</option>
                       <option value="HR_ACCOUNTS">HR & Accounts</option>
                       <option value="COMPANY_ADMIN">Company Administrator</option>
